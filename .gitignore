@@ -1,0 +1,23 @@
+cat > .gitignore <<'EOF'
+# Python virtual environment
+.venv/
+__pycache__/
+*.py[cod]
+
+# Cryptographic key material
+*.pem
+
+# Local examination paper
+sender/exam_paper.txt
+
+# Generated encrypted packages
+exchange/*.json
+
+# Recovered plaintext
+recovered/*
+!recovered/.gitkeep
+
+# Test and coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/

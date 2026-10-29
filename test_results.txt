@@ -1,0 +1,20 @@
+Automated Test Results
+======================
+Command:
+  python -m unittest discover -s tests -v
+
+Result from the authoring environment:
+  Ran 8 tests in 2.507s
+  OK
+
+Scenarios covered:
+  PASS - Authorized recipient recovers original file
+  PASS - Ciphertext modification is rejected
+  PASS - Metadata modification is rejected
+  PASS - Signature modification is rejected
+  PASS - Wrong recipient private key is rejected
+  PASS - Wrong sender public key is rejected
+  PASS - Two encryptions of the same file produce different packages
+  PASS - AES-GCM tag failure is rejected even with a valid package signature
+
+Note: Runtime varies by computer. Run the test command locally to produce fresh results on your machine.

@@ -1,0 +1,11 @@
+DEMONSTRATION ONLY — NOT A REAL EXAM
+
+Institute: Example Institute
+Course: Introduction to Cryptography
+Semester: 5
+
+Question 1: Explain confidentiality, integrity, and authentication.
+
+Question 2: Why are AES-GCM and RSA-OAEP used for different purposes?
+
+Question 3: Explain what a digital signature can and cannot prove.
