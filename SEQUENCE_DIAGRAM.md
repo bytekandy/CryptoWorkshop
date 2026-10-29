@@ -1,37 +1,39 @@
-# Sequence Diagram — Secure Examination-Paper Exchange
+# Sequence Diagram - Secure Examination-Paper Exchange
 
 ```mermaid
 sequenceDiagram
     actor S as Sender / Faculty
-    participant E as Exchange Folder (Untrusted)
+    participant E as Untrusted Exchange Folder
     actor A as Attacker
     actor R as Recipient / Coordinator
 
-    S->>S: Generate fresh AES-256 session key and nonce
-    S->>S: Encrypt paper using AES-GCM and authenticate metadata as AAD
-    S->>S: Encrypt AES key with recipient public key using RSA-OAEP/SHA-256
-    S->>S: Sign metadata, encrypted key, nonce, ciphertext and tag using RSA-PSS/SHA-256
-    S->>E: Store signed encrypted JSON package
-    Note over E,A: Package crosses an untrusted channel
-    A-->>E: May read, modify or replace package
+    S->>S: Generate AES key and nonce
+    S->>S: Encrypt paper with AES-GCM
+    S->>S: Encrypt AES key with recipient RSA public key
+    S->>S: Sign package using RSA-PSS
+    S->>E: Save encrypted package
+    Note over E,A: Package travels through an untrusted channel
+    A-->>E: May read, modify, or replace package
     E->>R: Deliver package
-    R->>R: Validate package format and verify signature with trusted sender public key
-    alt Signature invalid
-        R-->>R: Reject package; do not decrypt or write plaintext
-    else Signature valid
-        R->>R: Decrypt session key with recipient private key and RSA-OAEP
-        R->>R: Verify GCM tag and decrypt ciphertext using authenticated metadata
+    R->>R: Verify signature with trusted sender public key
+    alt Signature is invalid
+        R-->>R: Reject package without writing plaintext
+    else Signature is valid
+        R->>R: Decrypt AES key with recipient private key
+        R->>R: Verify GCM tag and decrypt file
         alt GCM authentication fails
-            R-->>R: Reject package; write no plaintext
+            R-->>R: Reject package without writing plaintext
         else GCM authentication succeeds
-            R->>R: Verify plaintext size and atomically write recovered file
+            R->>R: Write recovered file
         end
     end
 ```
 
-## Sequence summary
+## Walkthrough
 
-1. The sender encrypts the input file with AES-GCM, wraps the AES key for the recipient with RSA-OAEP, and signs all security-relevant package fields using RSA-PSS.
-2. The exchange folder represents the untrusted channel. An attacker can alter or replace bytes but cannot make the altered package pass verification without the signing key.
-3. The recipient checks the signature before recovering the session key. AES-GCM then independently authenticates the encrypted content and metadata.
-4. The program writes plaintext only after signature verification, successful session-key recovery, successful GCM authentication, and a size check.
+1. The sender encrypts the paper with a fresh AES key and nonce.
+2. The sender encrypts that AES key with the recipient's RSA public key.
+3. The sender signs the package, including its metadata, encrypted key, nonce, ciphertext, and authentication tag.
+4. The package passes through the untrusted exchange folder. An attacker may change it, but cannot make a modified package pass signature verification without the sender's private key.
+5. The recipient verifies the signature, recovers the AES key, and checks the GCM authentication tag.
+6. The program writes the recovered file only after the checks succeed.

@@ -1,135 +1,283 @@
-# Secure Examination-Paper Exchange (Python)
+# Secure Examination-Paper Exchange
 
-A workshop demonstration of hybrid encryption, a digital signature, and authenticated decryption. It is a local command-line simulation: the `exchange/` directory represents an untrusted communication channel.
+This project was developed as part of a Cryptography workshop. The aim is to securely transfer an examination paper from a faculty member to an authorised examination coordinator, even if the file passes through an untrusted channel.
 
-> Use only fictional examination material. This workshop project is a learning demonstration, not a complete institutional key-management system.
+The application is written in Python and runs from the command line. For this demonstration, the `exchange/` directory acts as the communication channel. The sender places an encrypted package there, and the recipient retrieves and decrypts it.
 
-## 1. Cryptography used
+**Note:** This is an educational project. Use fictional examination material for testing, not actual confidential examination papers.
 
-- **RSA-3072**: separate key pairs are generated for sender and recipient.
-- **AES-256-GCM**: encrypts the entire file using a fresh 256-bit session key and a fresh 12-byte nonce for each encryption. Its 16-byte authentication tag is stored separately in the JSON package.
-- **RSA-OAEP with SHA-256**: encrypts the small AES session key with the recipient's public key.
-- **RSA-PSS with SHA-256**: signs a canonical representation of the package using the sender's private key.
-- **Encrypted private-key PEMs**: private keys are stored as PKCS#8 PEM files protected by passphrases. The passphrases are requested using `getpass`; they are not stored in the project.
+## Cryptographic Algorithms Used
 
-The package signature covers the metadata, encrypted session key, nonce, ciphertext, and GCM tag. Metadata is also passed to AES-GCM as associated authenticated data (AAD). The receiver verifies the signature before attempting to decrypt the session key, and writes plaintext only after AES-GCM authentication succeeds.
+The application combines symmetric encryption, public-key cryptography, and digital signatures.
 
-## 2. Install (Arch Linux / other Linux)
+| Algorithm | Purpose |
+|---|---|
+| RSA-3072 | Generates separate key pairs for the sender and recipient |
+| AES-256-GCM | Encrypts the examination paper and authenticates the encrypted data |
+| RSA-OAEP with SHA-256 | Encrypts the AES session key using the recipient's public key |
+| RSA-PSS with SHA-256 | Signs the encrypted package using the sender's private key |
+| Base64 | Encodes binary data so it can be stored in a JSON package |
 
-Run these commands in this project directory:
+A new random AES session key and nonce are generated for every encryption. The AES key is encrypted with the recipient's public key, so the recipient can recover it using their private key.
+
+The sender signs the package, including its metadata, encrypted session key, nonce, ciphertext, and authentication tag. The recipient verifies the signature before decrypting the session key and checks the AES-GCM authentication tag before writing the recovered file.
+
+Private keys are stored in passphrase-protected PEM files. The application asks for passphrases when needed rather than storing them in the source code.
+
+## Requirements
+
+- Python 3.10 or newer
+- `pip`
+- An internet connection for installing the required Python library
+
+You can use Windows, Linux, or macOS. The commands below assume you have opened a terminal in the project directory.
+
+## Installation
+
+Clone the repository and enter the project directory:
 
 ```bash
-python -m venv .venv
+git clone https://github.com/bytekandy/CryptoWorkshop.git
+cd CryptoWorkshop
+```
+
+### Windows — PowerShell
+
+Create a virtual environment, activate it, and install the dependency:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+```
+
+If PowerShell blocks virtual-environment activation, you can use the environment's Python executable directly:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+In that case, replace `python` in the remaining commands with `.\.venv\Scripts\python.exe`.
+
+### Windows — Command Prompt
+
+```bat
+py -m venv .venv
+.venv\Scripts\activate.bat
+python -m pip install -r requirements.txt
+```
+
+### Linux and macOS
+
+```bash
+python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
 
-If the `python` command is unavailable, install Python and its virtual-environment support using your distribution's package manager.
+The application uses the `cryptography` Python library for its cryptographic operations.
 
-## 3. Generate keys and simulate trusted public-key exchange
+## Running the Application
+
+### 1. Generate the keys
+
+Run:
 
 ```bash
 python main.py setup
 ```
 
-Create two different passphrases when prompted. Use at least 12 characters and store them securely. The program creates:
+The program asks you to create two different passphrases, one for the sender's private key and another for the recipient's private key. Each passphrase must contain at least 12 characters.
+
+The application generates separate RSA key pairs for both participants and saves the keys in their respective directories.
+
+The relevant files are:
 
 ```text
-sender/private_key.pem          Sender's encrypted private key
-sender/public_key.pem           Sender's public key
-recipient/private_key.pem       Recipient's encrypted private key
-recipient/public_key.pem        Recipient's public key
-trusted_keys/sender_public_key.pem
-sender/recipient_public_key.pem
+sender/
+├── private_key.pem
+├── public_key.pem
+└── recipient_public_key.pem
+
+recipient/
+├── private_key.pem
+└── public_key.pem
+
+trusted_keys/
+└── sender_public_key.pem
 ```
 
-The two public-key copies simulate an exchange through a trusted channel. The sender uses the recipient's public key. The recipient verifies with `trusted_keys/sender_public_key.pem`. In a real deployment, confirm public-key fingerprints using an independent trusted channel; simply downloading a public key from the same untrusted channel does not authenticate its owner.
+The sender's public key is copied to `trusted_keys/` for the recipient, while the recipient's public key is copied to `sender/` for encryption.
 
-`setup` refuses to overwrite existing private keys. To deliberately replace both keys, run `python main.py setup --force`. Do not do this while you still need to decrypt packages created for the old keys.
+This simulates the trusted public-key exchange assumed in the workshop problem. In a real deployment, public keys must be authenticated independently, for example by comparing their fingerprints through a trusted channel.
 
-## 4. Sender: encrypt and sign
+The setup command does not overwrite existing keys by default. Use `python main.py setup --force` only if you intend to replace them. Packages encrypted for the old recipient key may no longer be decryptable after replacing the keys.
 
-A fictional sample file is provided at `sender/exam_paper.txt`.
+### 2. Prepare a sample examination paper
+
+The repository includes a fictional sample file:
+
+```text
+samples/exam_paper.example.txt
+```
+
+Copy it into the sender's working directory.
+
+**Windows PowerShell:**
+
+```powershell
+Copy-Item samples/exam_paper.example.txt sender/exam_paper.txt
+```
+
+**Linux and macOS:**
+
+```bash
+cp samples/exam_paper.example.txt sender/exam_paper.txt
+```
+
+You can edit the copied file to try different input content. Do not use a real confidential examination paper.
+
+### 3. Encrypt and sign the file
+
+Run:
 
 ```bash
 python main.py encrypt --input sender/exam_paper.txt --output exchange/package_1.json
 ```
 
-Enter the sender private-key passphrase when requested. The output is a JSON package containing metadata, an RSA-OAEP-encrypted AES key, nonce, ciphertext, GCM tag, and RSA-PSS signature. It does not contain the original plaintext.
+Enter the sender's private-key passphrase when prompted.
 
-Encrypt the same file again to demonstrate fresh randomness:
+The application reads the file, generates a fresh AES session key and nonce, encrypts the file using AES-GCM, and encrypts the session key using the recipient's RSA public key.
+
+It then signs the package using the sender's RSA private key and saves the result as a JSON file in `exchange/`.
+
+The package contains the encrypted data and the information required for verification and decryption, not the original examination text in plaintext.
+
+### 4. Encrypt the same file again
+
+To demonstrate that fresh randomness is used, run:
 
 ```bash
 python main.py encrypt --input sender/exam_paper.txt --output exchange/package_2.json
 ```
 
-Both packages should decrypt to the same original bytes but should differ from each other.
+The two packages should differ even though they were generated from the same input file.
 
-## 5. Recipient: verify and decrypt
+Both packages should still decrypt to the same original contents.
 
-Treat the JSON file in `exchange/` as if it arrived through an untrusted channel:
+### 5. Verify and decrypt the package
+
+The recipient runs:
 
 ```bash
 python main.py decrypt --input exchange/package_1.json --output recovered/exam_paper.txt
 ```
 
-Enter the recipient private-key passphrase. The order is:
+Enter the recipient's private-key passphrase when prompted.
 
-1. Parse and validate the package structure and algorithm identifiers.
-2. Verify the signature using the trusted sender public key.
-3. Decrypt the AES session key with the recipient private key and RSA-OAEP/SHA-256.
-4. Verify the AES-GCM tag and decrypt using the signed metadata as AAD.
-5. Check the recovered size and atomically write the plaintext.
+The recipient performs these checks in order:
 
-If validation, signature verification, session-key decryption, or GCM authentication fails, the program reports an error and does not write a new plaintext file. Test failures with a new/nonexistent output path so an old successful output cannot be confused with a new result.
+1. Reads and validates the package structure.
+2. Verifies the digital signature using the trusted sender public key.
+3. Decrypts the AES session key using the recipient's private key.
+4. Authenticates and decrypts the file using AES-GCM.
+5. Checks the recovered file size and writes the plaintext only after successful verification.
 
-## 6. Confirm correct recovery and fresh packages
+If a signature, key, package field, or authentication tag is invalid, the application rejects the package without writing newly decrypted plaintext.
+
+For failure tests, use a new output filename or remove any previous output file first. This prevents an old successful result from being mistaken for a new decryption.
+
+## Verifying the Results
+
+After a successful decryption, compare the original and recovered files.
+
+### Windows — PowerShell
+
+```powershell
+$original = Get-FileHash sender/exam_paper.txt -Algorithm SHA256
+$recovered = Get-FileHash recovered/exam_paper.txt -Algorithm SHA256
+
+$original
+$recovered
+```
+
+The two SHA-256 hash values should match.
+
+### Linux and macOS
 
 ```bash
 cmp sender/exam_paper.txt recovered/exam_paper.txt
 sha256sum sender/exam_paper.txt recovered/exam_paper.txt
 ```
 
-`cmp` prints nothing and returns exit status 0 if the files are identical. The two SHA-256 hashes should match.
+If `cmp` produces no output and exits with status `0`, the files are identical.
 
-Check that separate encryptions produce different packages:
+## Running the Security Tests
 
-```bash
-if cmp -s exchange/package_1.json exchange/package_2.json; then
-  echo "Unexpected: packages are identical"
-else
-  echo "Expected: packages differ"
-fi
-```
-
-## 7. Run all automated security tests
+Run the automated test suite from the project directory:
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-Tests create temporary key pairs and temporary input/output files; they do not overwrite your working demo keys or the files in `sender/`, `exchange/`, or `recovered/`. They cover:
+The tests use temporary files and temporary RSA keys. They cover the following cases:
 
-1. Authorized recipient recovers the original file.
-2. Modified ciphertext is rejected by signature verification.
-3. Modified metadata is rejected by signature verification.
-4. Modified signature is rejected.
-5. Incorrect recipient private key cannot recover the session key.
-6. Incorrect sender public key cannot validate the signature.
-7. Encrypting the same file twice creates different packages, both of which decrypt correctly.
-8. GCM tag verification fails even when the altered package is re-signed in the test, demonstrating the second authentication layer.
+1. The authorised recipient successfully recovers the original file.
+2. A modified ciphertext is rejected.
+3. Modified metadata is rejected.
+4. A modified digital signature is rejected.
+5. An incorrect recipient private key cannot recover the session key.
+6. An incorrect sender public key fails signature verification.
+7. Encrypting the same file twice produces different packages that both decrypt correctly.
+8. AES-GCM rejects a modified authentication tag even when the test signs the modified package again.
 
-## 8. How to explain the security properties
+The expected result is that all eight tests pass.
 
-- **Confidentiality:** The file is encrypted using AES-256-GCM. The AES key is encrypted for the recipient using the recipient's RSA public key. A person who only obtains the package should not be able to read the paper without the recipient's private key.
-- **Integrity:** RSA-PSS detects changes to any signed package field. AES-GCM separately authenticates the ciphertext and metadata used as AAD.
-- **Sender authentication:** The recipient verifies the signature using a sender public key that was authenticated through a trusted channel. A signature alone does not prove a real-world identity unless the key-to-person binding is trusted.
-- **Failure handling:** The program rejects malformed packages, bad signatures, wrong recipient keys, and failed GCM authentication. Plaintext is written only after all cryptographic checks succeed.
+## How the Application Provides Security
 
-## 9. Important limitations
+**Confidentiality**
 
-- The `setup` command copies public keys locally only to simulate a trusted exchange. In a real system, verify key fingerprints or use a managed certificate/public-key infrastructure.
-- The sender and recipient passphrases are entered interactively but the strength and secrecy of those passphrases remain the operator's responsibility.
-- This demo loads the whole file into memory; very large files would need a carefully designed streaming-encryption format.
-- A valid signature does not prevent replay of an older, valid package. A production system should add policy checks such as an expected exam identifier, recipient identity, validity period, and duplicate/replay tracking.
-- Packages are protected cryptographically, but you must still protect the computer, backups, and private keys. Do not commit private keys or real examination papers to source control.
+AES-256-GCM encrypts the examination paper. RSA-OAEP protects the AES session key so that the intended recipient can recover it using their private key.
+
+**Integrity**
+
+RSA-PSS detects changes to the signed package. AES-GCM also authenticates the encrypted data and associated metadata.
+
+**Sender Authentication**
+
+The recipient verifies the package using the trusted sender public key. A valid signature shows that the package was signed using the corresponding private key. Associating that key with a particular faculty member depends on trusting the public-key exchange.
+
+**Failure Handling**
+
+Malformed packages, invalid signatures, incorrect recipient keys, and failed AES-GCM authentication result in rejection. The application writes plaintext only after the required cryptographic checks succeed.
+
+## Limitations
+
+- The project simulates communication using local folders rather than an actual network connection.
+- The public-key exchange is simulated locally. A real system needs a reliable way to verify the identity associated with each public key.
+- The program reads the complete file into memory, so it is intended for small demonstration files.
+- The application does not implement replay prevention or institutional access-control policies.
+- Private keys, passphrases, generated packages, recovered plaintext, and real examination papers must not be committed to a public repository.
+
+## Project Structure
+
+```text
+CryptoWorkshop/
+├── main.py
+├── crypto_utils.py
+├── requirements.txt
+├── README.md
+├── SEQUENCE_DIAGRAM.md
+├── test_results.txt
+├── samples/
+│   └── exam_paper.example.txt
+└── tests/
+    └── test_crypto.py
+```
+
+- `main.py` — command-line interface for setup, encryption, and decryption.
+- `crypto_utils.py` — key generation, encryption, signing, verification, and file handling.
+- `tests/test_crypto.py` — automated security tests.
+- `SEQUENCE_DIAGRAM.md` — sequence diagram showing the communication flow.
+- `samples/exam_paper.example.txt` — fictional input for the demonstration.
+- `requirements.txt` — Python dependencies.
